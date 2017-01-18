@@ -81,6 +81,10 @@ And the system library:
 
 - `librt`
 
+Alternatively and/or additionally, specific flags needed to build the binary can be specified via:
+
+- `LDFLAGS` - list of link-time flags.
+
 ## Tests
 
 Any binaries beneath a directory named "test" are executed by the build process.

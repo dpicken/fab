@@ -116,15 +116,21 @@ $(foreach bin,$(bins),$(eval $(call eval_bin_prereqs,$(bin))))
 #   $(build_dir)/example/example.a
 #   $(build_dir)/example/subexample/subexample.a
 #   librt
+#
+# Alternatively and/or additionally, specific link flags needed to build the binary can be specified via:
+#
+#   LDFLAGS - list of link flags
 define eval_bin_makefile_prereqs
   bin_makefile := $1
   bin_build_dir := $(patsubst $(src_dir)%/,$(build_dir)%,$(dir $(bin_makefile)))
   bin := $$(bin_build_dir)/$$(notdir $$(bin_build_dir))
 
+  LDFLAGS :=
   LIB_DIRS :=
   SYSTEM_LIBS :=
   include $(bin_makefile)
 
+  $$(bin).ldflags := $$(strip $$(LDFLAGS))
   $$(bin).libs := $$(strip $$($$(bin).libs) $$(foreach lib_dir,$$(LIB_DIRS),$(build_dir)/$$(lib_dir)/$$(notdir $$(lib_dir).a)))
   $$(bin).system_libs := $$(strip $$(SYSTEM_LIBS))
   $$(bin).bin_makefile := $(bin_makefile)
@@ -203,7 +209,7 @@ bin_recipe_system_lib_flags = $(patsubst %,-l%,$($@.system_libs))
 
 $(bins): $$($$@.libs) $$($$@.bin_makefile) | $(target_prereq_parent_dir)
 	$(echo_build_message)
-	$(echo_recipe)$(cxx) -o $@ $(cxxflags) $(bin_recipe_lib_flags) $(bin_recipe_system_lib_flags)
+	$(echo_recipe)$(cxx) -o $@ $(cxxflags) $($@.ldflags) $(bin_recipe_lib_flags) $(bin_recipe_system_lib_flags)
 
 test_pass_prereq_test_bin := $$(patsubst %.pass,%,$$@)
 test_pass_recipe_log_file = $(patsubst %.pass,%.log,$@)
