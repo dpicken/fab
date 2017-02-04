@@ -94,6 +94,7 @@ bins := $(foreach bin_dir,$(bin_dirs),$(patsubst $(src_dir)%,$(build_dir)%,$(bin
 define eval_bin_prereqs
   bin := $1
 
+  $$(bin).ldflags :=
   $$(bin).libs := $$(filter $$(bin).a,$$(libs))
   $$(bin).system_libs :=
   $$(bin).bin_makefile :=
