@@ -13,7 +13,7 @@ cxxflags_g++ += -Wextra
 cxxflags_g++ += -Wpedantic
 
 CXXFLAGS += -Werror
-CXXFLAGS += -Wno-error-padded
+CXXFLAGS += -Wno-error=padded
 
 ifeq ($(origin cxxflags_$(CXX)),undefined)
   $(error cxxflags_$(CXX): undefined)
