@@ -1,6 +1,6 @@
-CXX := $(if $(filter c++,$(CXX)),$(shell readlink `type -p c++`),$(CXX))
+CXXSTD ?= -std=c++14
 
-CXXFLAGS += -std=c++14
+CXXFLAGS += $(CXXSTD)
 CXXFLAGS += -g
 
 cxxflags_clang++ :=
@@ -14,6 +14,8 @@ cxxflags_g++ += -Wpedantic
 
 CXXFLAGS += -Werror
 CXXFLAGS += -Wno-error=padded
+
+CXX := $(if $(filter c++,$(CXX)),$(shell readlink `type -p c++`),$(CXX))
 
 ifeq ($(origin cxxflags_$(CXX)),undefined)
   $(error cxxflags_$(CXX): undefined)
