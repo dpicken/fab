@@ -1,4 +1,4 @@
-CXXSTD ?= -std=c++14
+CXXSTD ?= -std=c++17
 
 CXXFLAGS += $(CXXSTD)
 CXXFLAGS += -g
