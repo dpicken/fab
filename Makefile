@@ -12,10 +12,13 @@ SHELL := bash
 
 # Default project configuration that SHOULD only be overriden in config*.make files (see below).
 SRC_DIR ?= src
-SRC_EXT ?= cc
+SRC_EXT_CXX ?= cc
+SRC_EXT_AS ?= s
 BUILD_DIR ?= build
 CXX ?= g++
 CXXFLAGS ?=
+AS ?= as
+ASFLAGS ?=
 AR ?= ar
 
 # Default project configuration that MAY be overriden by the environment (or config*.make files).
@@ -35,10 +38,13 @@ endif
 
 # Final expansion of configuration.
 src_dir := $(SRC_DIR)
-src_ext := $(SRC_EXT)
+src_ext_cxx := $(SRC_EXT_CXX)
+src_ext_as := $(SRC_EXT_AS)
 build_dir := $(BUILD_DIR)
 cxx := $(CXX)
 cxxflags := $(strip -I$(src_dir) $(CXXFLAGS))
+as := $(AS)
+asflags := $(ASFLAGS)
 ar := $(AR)
 echo_build_messages := $(ECHO_BUILD_MESSAGES)
 echo_recipes := $(ECHO_RECIPES)
@@ -46,8 +52,12 @@ echo_recipes := $(ECHO_RECIPES)
 # Source files MUST be placed in directories beneath $(src_dir).
 cmd_find_stem := find $(src_dir) -mindepth 2
 
-srcs := $(shell $(cmd_find_stem) -name '*.$(src_ext)')
-objs := $(patsubst $(src_dir)%.$(src_ext),$(build_dir)%.o,$(srcs))
+srcs_cxx := $(shell $(cmd_find_stem) -name '*.$(src_ext_cxx)')
+srcs_as := $(shell $(cmd_find_stem) -name '*.$(src_ext_as)')
+srcs := $(srcs_cxx) $(srcs_as)
+objs_cxx := $(patsubst $(src_dir)%,$(build_dir)%.o,$(srcs_cxx))
+objs_as := $(patsubst $(src_dir)%,$(build_dir)%.o,$(srcs_as))
+objs := $(objs_cxx) $(objs_as)
 deps := $(patsubst %.o,%.d,$(objs))
 
 # A static library is built for each directory that contains source files.
@@ -67,9 +77,10 @@ libs := $(foreach lib_dir,$(lib_dirs),$(lib_dir)/$(notdir $(lib_dir).a))
 define eval_lib_prereqs
   lib := $1
   lib_src_dir := $(patsubst $(build_dir)%/,$(src_dir)%,$(dir $(lib)))
-  lib_srcs := $$(wildcard $$(lib_src_dir)/*.$(src_ext))
+  lib_srcs := $$(wildcard $$(lib_src_dir)/*.$(src_ext_cxx))
+  lib_srcs += $$(wildcard $$(lib_src_dir)/*.$(src_ext_as))
 
-  $$(lib).objs := $$(patsubst $(src_dir)%.$(src_ext),$(build_dir)%.o,$$(lib_srcs))
+  $$(lib).objs := $$(patsubst $(src_dir)%,$(build_dir)%.o,$$(lib_srcs))
   $$(lib).src_dir := $$(lib_src_dir)
 endef
 $(foreach lib,$(libs),$(eval $(call eval_lib_prereqs,$(lib))))
@@ -85,7 +96,7 @@ $(foreach lib,$(libs),$(eval $(call eval_lib_prereqs,$(lib))))
 #   - $(build_dir)/hello_world/hello_world (implicitly linked with hello_world.a)
 #
 # Any additional libraries a binary depends on MUST be explicitly specified in $(src_dir)/hello_world/bin.make (see below).
-bin_main_dirs := $(patsubst %/main.$(src_ext),%,$(filter %/main.$(src_ext),$(srcs)))
+bin_main_dirs := $(patsubst %/main.$(src_ext_cxx),%,$(filter %/main.$(src_ext_cxx),$(srcs_cxx)))
 bin_makefiles=$(shell $(cmd_find_stem) -name bin.make)
 bin_makefile_dirs := $(patsubst %/,%,$(dir $(bin_makefiles)))
 bin_dirs := $(patsubst $(src_dir)%,$(build_dir)%,$(sort $(bin_main_dirs) $(bin_makefile_dirs)))
@@ -182,16 +193,26 @@ $(build_dir_tree): | $(target_prereq_parent_dir)
 	$(echo_build_message)
 	$(echo_recipe)mkdir $(if $(findstring B,$(MAKEFLAGS)),-p )$@
 
-obj_prereq_src_file := $$(patsubst $(build_dir)%.o,$(src_dir)%.$(src_ext), $$@)
+dep_ext_tmp = tmp.d
+obj_prereq_src_file := $$(patsubst $(build_dir)%.o,$(src_dir)%, $$@)
 obj_makefiles = $(strip $(config_makefiles) $(makefile))
 obj_recipe_src_file = $<
 obj_recipe_dep_file = $(patsubst %.o,%.d,$@)
+obj_recipe_makefile_deps = $(echo_recipe)echo "$@ $(obj_makefiles)" | awk '{ for(i = 2; i <= NF; i++) deps = deps " " $$i; print "\n" $$1 ":" deps; for(i = 2; i <= NF; i++) print "\n" $$i ":"}'
 
-$(objs): $(obj_prereq_src_file) $(obj_makefiles) | $(target_prereq_parent_dir)
+$(objs_cxx): $(obj_prereq_src_file) $(obj_makefiles) | $(target_prereq_parent_dir)
 	$(echo_build_message)
-	$(echo_recipe)$(cxx) -o $(obj_recipe_dep_file) -MM -MT $@ -MP $(cxxflags) $(obj_recipe_src_file)
-	$(echo_recipe)echo "$@ $(obj_makefiles)" | awk '{ for(i = 2; i <= NF; i++) deps = deps " " $$i; print "\n" $$1 ":" deps; for(i = 2; i <= NF; i++) print "\n" $$i ":"}' >>$(obj_recipe_dep_file)
+	$(echo_recipe)$(cxx) -MM -MT $@ -MP $(cxxflags) $(obj_recipe_src_file) > $(obj_recipe_dep_file).$(dep_ext_tmp)
+	$(echo_recipe)$(obj_recipe_makefile_deps) >>$(obj_recipe_dep_file).$(dep_ext_tmp)
+	$(echo_recipe)mv $(obj_recipe_dep_file).$(dep_ext_tmp) $(obj_recipe_dep_file)
 	$(echo_recipe)$(cxx) -o $@ -c $(cxxflags) $(obj_recipe_src_file)
+
+$(objs_as): $(obj_prereq_src_file) $(obj_makefiles) | $(target_prereq_parent_dir)
+	$(echo_build_message)
+	$(echo_recipe)echo "$@: $(obj_recipe_src_file)" >$(obj_recipe_dep_file).$(dep_ext_tmp)
+	$(echo_recipe)$(obj_recipe_makefile_deps) >>$(obj_recipe_dep_file).$(dep_ext_tmp)
+	$(echo_recipe)mv $(obj_recipe_dep_file).$(dep_ext_tmp) $(obj_recipe_dep_file)
+	$(echo_recipe)$(as) -o $@ $(asflags) $(obj_recipe_src_file)
 
 $(libs): $$($$@.objs) $$($$@.src_dir)
 	$(echo_build_message)
