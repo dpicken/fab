@@ -49,19 +49,21 @@ ar := $(AR)
 echo_build_messages := $(ECHO_BUILD_MESSAGES)
 echo_recipes := $(ECHO_RECIPES)
 
-# Source files MUST be placed in directories beneath $(src_dir).
-cmd_find_stem := find $(src_dir) -mindepth 2
+# Host information
+host_os := $(shell uname -s | tr "[:upper:]" "[:lower:]")
+host_machine_type := $(shell uname -m | tr "[:upper:]" "[:lower:]")
 
-srcs_cxx := $(shell $(cmd_find_stem) -name '*.$(src_ext_cxx)')
-srcs_as := $(shell $(cmd_find_stem) -name '*.$(src_ext_as)')
-srcs := $(srcs_cxx) $(srcs_as)
-objs_cxx := $(patsubst $(src_dir)%,$(build_dir)%.o,$(srcs_cxx))
-objs_as := $(patsubst $(src_dir)%,$(build_dir)%.o,$(srcs_as))
-objs := $(objs_cxx) $(objs_as)
-deps := $(patsubst %.o,%.d,$(objs))
+# Source files MUST be placed in directories beneath $(src_dir).
+cmd_find_src_stem := find $(src_dir) -mindepth 1
+
+srcs_cxx :=
+srcs_as :=
+objs_cxx :=
+objs_as :=
+libs :=
 
 # A static library is built for each directory that contains source files.
-# The library is named after the directory, e.g. the source tree...
+# The library is named after its directory, e.g. the source tree...
 #
 #   $(src_dir)/example/foo.cc
 #   $(src_dir)/example/bar.cc
@@ -71,19 +73,49 @@ deps := $(patsubst %.o,%.d,$(objs))
 #
 #   $(build_dir)/example/example.a (containing the object files built from foo.cc and bar.cc).
 #   $(build_dir)/example/subexample/subexample.a (containing the object file built from qux.cc).
-lib_dirs := $(patsubst %/,%,$(sort $(dir $(objs))))
-libs := $(foreach lib_dir,$(lib_dirs),$(lib_dir)/$(notdir $(lib_dir).a))
+#
+# Any source files within a "platform/" directory are filtered; only those with a ".$(host_os)-$(host_machine_type)" suffix
+# prior to the file name's (final) extension are included...
+#
+#   $(src_dir)/example/platform/foo.darwin-x86_64.cc
+#   $(src_dir)/example/platform/foo.linux-x86_64.cc
+#
+# will produce the following on a x64_64 macOS host...
+#
+#   $(build_dir)/example/platform/platform.a (containing the object file built from foo.darwin-x86_64.cc).
+#
+# ...and the following on a x86_64 Linux host:
+#
+#   $(build_dir)/example/platform/platform.a (containing the object file built from foo.linux-x86_64.cc).
+src_sub_dirs := $(shell $(cmd_find_src_stem) -type d)
 
-define eval_lib_prereqs
-  lib := $1
-  lib_src_dir := $(patsubst $(build_dir)%/,$(src_dir)%,$(dir $(lib)))
-  lib_srcs := $$(wildcard $$(lib_src_dir)/*.$(src_ext_cxx))
-  lib_srcs += $$(wildcard $$(lib_src_dir)/*.$(src_ext_as))
+define eval_lib
+  src_sub_dir := $1
 
-  $$(lib).objs := $$(patsubst $(src_dir)%,$(build_dir)%.o,$$(lib_srcs))
-  $$(lib).src_dir := $$(lib_src_dir)
+  src_file_stem_pattern := $$(if $$(patsubst platform,,$$(notdir $$(src_sub_dir))),*,*.$(host_os)-$(host_machine_type))
+  lib_srcs_cxx := $$(wildcard $$(src_sub_dir)/$$(src_file_stem_pattern).$(src_ext_cxx))
+  lib_srcs_as := $$(wildcard $$(src_sub_dir)/$$(src_file_stem_pattern).$(src_ext_as))
+
+  lib_objs_cxx := $$(patsubst $(src_dir)%,$(build_dir)%.o,$$(lib_srcs_cxx))
+  lib_objs_as := $$(patsubst $(src_dir)%,$(build_dir)%.o,$$(lib_srcs_as))
+  lib_objs := $$(strip $$(lib_objs_cxx) $$(lib_objs_as))
+
+  ifneq ($$(lib_objs),)
+    lib := $$(patsubst $(src_dir)%,$(build_dir)%,$$(src_sub_dir)/$$(notdir $$(src_sub_dir).a))
+    $$(lib).src_dir := $$(src_sub_dir)
+    $$(lib).objs := $$(lib_objs)
+
+    srcs_cxx += $$(lib_srcs_cxx)
+    srcs_as += $$(lib_srcs_as)
+    objs_cxx += $$(lib_objs_cxx)
+    objs_as += $$(lib_objs_as)
+    libs += $$(lib)
+  endif
 endef
-$(foreach lib,$(libs),$(eval $(call eval_lib_prereqs,$(lib))))
+$(foreach src_sub_dir,$(src_sub_dirs),$(eval $(call eval_lib,$(src_sub_dir))))
+lib_build_dirs := $(foreach lib,$(libs),$(patsubst %/,%,$(dir $(lib))))
+
+deps := $(patsubst %.o,%.d,$(strip $(objs_cxx) $(objs_as)))
 
 # An executable binary is built for each directory that contains a "main.cc" and/or a "bin.make" file.
 # The binary is named after the directory, e.g. the source tree...
@@ -97,12 +129,12 @@ $(foreach lib,$(libs),$(eval $(call eval_lib_prereqs,$(lib))))
 #
 # Any additional libraries a binary depends on MUST be explicitly specified in $(src_dir)/hello_world/bin.make (see below).
 bin_main_dirs := $(patsubst %/main.$(src_ext_cxx),%,$(filter %/main.$(src_ext_cxx),$(srcs_cxx)))
-bin_makefiles=$(shell $(cmd_find_stem) -name bin.make)
+bin_makefiles=$(shell $(cmd_find_src_stem) -name bin.make)
 bin_makefile_dirs := $(patsubst %/,%,$(dir $(bin_makefiles)))
-bin_dirs := $(patsubst $(src_dir)%,$(build_dir)%,$(sort $(bin_main_dirs) $(bin_makefile_dirs)))
-bins := $(foreach bin_dir,$(bin_dirs),$(patsubst $(src_dir)%,$(build_dir)%,$(bin_dir))/$(notdir $(bin_dir)))
+bin_build_dirs := $(patsubst $(src_dir)%,$(build_dir)%,$(sort $(bin_main_dirs) $(bin_makefile_dirs)))
+bins := $(foreach bin_dir,$(bin_build_dirs),$(patsubst $(src_dir)%,$(build_dir)%,$(bin_dir))/$(notdir $(bin_dir)))
 
-define eval_bin_prereqs
+define eval_bin
   bin := $1
 
   $$(bin).ldflags :=
@@ -110,7 +142,7 @@ define eval_bin_prereqs
   $$(bin).system_libs :=
   $$(bin).bin_makefile :=
 endef
-$(foreach bin,$(bins),$(eval $(call eval_bin_prereqs,$(bin))))
+$(foreach bin,$(bins),$(eval $(call eval_bin,$(bin))))
 
 # A "bin.make" file specifies any additional libraries that a binary depends on via two lists:
 #
@@ -132,8 +164,9 @@ $(foreach bin,$(bins),$(eval $(call eval_bin_prereqs,$(bin))))
 # Alternatively and/or additionally, specific link flags needed to build the binary can be specified via:
 #
 #   LDFLAGS - list of link flags
-define eval_bin_makefile_prereqs
+define eval_bin_makefile
   bin_makefile := $1
+
   bin_build_dir := $(patsubst $(src_dir)%/,$(build_dir)%,$(dir $(bin_makefile)))
   bin := $$(bin_build_dir)/$$(notdir $$(bin_build_dir))
 
@@ -147,7 +180,7 @@ define eval_bin_makefile_prereqs
   $$(bin).system_libs := $$(strip $$(SYSTEM_LIBS))
   $$(bin).bin_makefile := $(bin_makefile)
 endef
-$(foreach bin_makefile,$(bin_makefiles),$(eval $(call eval_bin_makefile_prereqs,$(bin_makefile))))
+$(foreach bin_makefile,$(bin_makefiles),$(eval $(call eval_bin_makefile,$(bin_makefile))))
 
 # Any binaries beneath "test" directories are executed by the build process.
 # A test MUST return zero on success / non-zero on failure.
@@ -166,7 +199,7 @@ $(foreach bin_makefile,$(bin_makefiles),$(eval $(call eval_bin_makefile_prereqs,
 tests := $(shell echo $(bins) | awk -v RS=" " '/\/test\//')
 test_passes := $(patsubst %,%.pass,$(tests))
 
-build_dir_tree := $(sort $(foreach path,$(sort $(lib_dirs) $(bin_dirs)),$(eval branches :=)$(patsubst %/,%,$(strip $(foreach dir,$(subst /, ,$(path)),$(eval branches := $(branches)$(dir)/) $(branches))))))
+build_dir_tree := $(sort $(foreach path,$(sort $(lib_build_dirs) $(bin_build_dirs)),$(eval branches :=)$(patsubst %/,%,$(strip $(foreach dir,$(subst /, ,$(path)),$(eval branches := $(branches)$(dir)/) $(branches))))))
 
 echo_build_message = $(if $(echo_build_messages),$(info Building $@$(if $?, on $(if $(filter-out $?,$^),$?,$^))))
 echo_recipe := $(if $(echo_recipes),,@)
@@ -176,7 +209,7 @@ all: $(libs) $(bins) $(test_passes)
 
 .PHONEY: clean
 clean:
-	$(echo_recipe)[ ! -d $(build_dir) ] || find $(build_dir) -type f \( -name '*.o' -o -name '*.d' -o -name '*.a' -o $(if $(findstring Linux,$(kernel)),-executable,-perm +u=x,g=x,o=x) -o -name '*.log' -o -name '*.pass' \) -delete
+	$(echo_recipe)[ ! -d $(build_dir) ] || find $(build_dir) -type f \( -name '*.o' -o -name '*.d' -o -name '*.a' -o $(if $(findstring linux,$(host_os)),-executable,-perm +u=x,g=x,o=x) -o -name '*.log' -o -name '*.pass' \) -delete
 	$(echo_recipe)[ ! -d $(build_dir) ] || find $(build_dir) -type d -delete
 
 .PHONEY: inspect
@@ -218,15 +251,14 @@ $(libs): $$($$@.objs) $$($$@.src_dir)
 	$(echo_build_message)
 	$(echo_recipe)rm -f $@ && $(ar) qcs $@ $(filter %.o,$^)
 
-bin_recipe_lib_flags_pre_Linux := -Wl,--whole-archive
-bin_recipe_lib_flags_post_Linux := -Wl,--no-whole-archive
-bin_recipe_lib_flags_pre_Darwin := -Wl,-force_load
-bin_recipe_lib_flags_post_Darwin :=
-kernel := $(shell uname -s)
-ifeq ($(origin bin_recipe_lib_flags_post_$(kernel)),undefined)
-  $(error bin_recipe_lib_flags_post_$(kernel): undefined)
+bin_recipe_lib_flags_pre_linux := -Wl,--whole-archive
+bin_recipe_lib_flags_post_linux := -Wl,--no-whole-archive
+bin_recipe_lib_flags_pre_darwin := -Wl,-force_load
+bin_recipe_lib_flags_post_darwin :=
+ifeq ($(origin bin_recipe_lib_flags_post_$(host_os)),undefined)
+  $(error bin_recipe_lib_flags_post_$(host_os): undefined)
 endif
-bin_recipe_lib_flags = $(patsubst %,$(bin_recipe_lib_flags_pre_$(kernel)) % $(bin_recipe_lib_flags_post_$(kernel)),$(filter %.a,$^))
+bin_recipe_lib_flags = $(patsubst %,$(bin_recipe_lib_flags_pre_$(host_os)) % $(bin_recipe_lib_flags_post_$(host_os)),$(filter %.a,$^))
 bin_recipe_system_lib_flags = $(patsubst %,-l%,$($@.system_libs))
 
 $(bins): $$($$@.libs) $$($$@.bin_makefile) | $(target_prereq_parent_dir)
