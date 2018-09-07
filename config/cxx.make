@@ -11,6 +11,7 @@ cxxflags_g++ :=
 cxxflags_g++ += -Wall
 cxxflags_g++ += -Wextra
 cxxflags_g++ += -Wpedantic
+cxxflags_g++ += -pthread
 
 CXXFLAGS += -Werror
 CXXFLAGS += -Wno-error=padded
