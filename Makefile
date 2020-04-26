@@ -20,6 +20,7 @@ CXXFLAGS ?=
 AS ?= as
 ASFLAGS ?=
 AR ?= ar
+LDFLAGS ?=
 
 # Default project configuration that MAY be overriden by the environment (or config*.make files).
 ECHO_BUILD_MESSAGES ?= x
@@ -46,6 +47,7 @@ cxxflags := $(strip -I$(src_dir) $(CXXFLAGS))
 as := $(AS)
 asflags := $(ASFLAGS)
 ar := $(AR)
+ldflags := $(LDFLAGS)
 echo_build_messages := $(ECHO_BUILD_MESSAGES)
 echo_recipes := $(ECHO_RECIPES)
 
@@ -263,7 +265,7 @@ bin_recipe_system_lib_flags = $(patsubst %,-l%,$($@.system_libs))
 
 $(bins): $$($$@.libs) $$($$@.bin_makefile) | $(target_prereq_parent_dir)
 	$(echo_build_message)
-	$(echo_recipe)$(cxx) -o $@ $(cxxflags) $($@.ldflags) $(bin_recipe_lib_flags) $(bin_recipe_system_lib_flags)
+	$(echo_recipe)$(cxx) -o $@ $(cxxflags) $(ldflags) $($@.ldflags) $(bin_recipe_lib_flags) $(bin_recipe_system_lib_flags)
 
 test_pass_prereq_test_bin := $$(patsubst %.pass,%,$$@)
 test_pass_recipe_log_file = $(patsubst %.pass,%.log,$@)
