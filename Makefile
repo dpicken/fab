@@ -17,9 +17,12 @@ SRC_EXT_AS ?= s
 BUILD_DIR ?= build
 CXX ?= g++
 CXXFLAGS ?=
+CXX.MKDEPS ?= $(CXX) -MM -MP -MT
+CXX.MKDEPS.CXXFLAGS ?= $(CXXFLAGS)
 AS ?= as
 ASFLAGS ?=
 AR ?= ar
+AR.MKLIB ?= $(AR) qcs
 LDFLAGS ?=
 
 # Default project configuration that MAY be overriden by the environment (or config*.make files).
@@ -44,9 +47,12 @@ src_ext_as := $(SRC_EXT_AS)
 build_dir := $(BUILD_DIR)
 cxx := $(CXX)
 cxxflags := $(strip -I$(src_dir) $(CXXFLAGS))
+cxx.mkdeps := $(CXX.MKDEPS)
+cxx.mkdeps.cxxflags := $(strip -I$(src_dir) $(CXX.MKDEPS.CXXFLAGS))
 as := $(AS)
 asflags := $(ASFLAGS)
 ar := $(AR)
+ar.mklib := $(AR.MKLIB)
 ldflags := $(LDFLAGS)
 echo_build_messages := $(ECHO_BUILD_MESSAGES)
 echo_recipes := $(ECHO_RECIPES)
@@ -237,7 +243,7 @@ obj_recipe_makefile_deps = $(echo_recipe)echo "$@ $(obj_makefiles)" | awk '{ for
 
 $(objs_cxx): $(obj_prereq_src_file) $(obj_makefiles) | $(target_prereq_parent_dir)
 	$(echo_build_message)
-	$(echo_recipe)$(cxx) -MM -MT $@ -MP $(cxxflags) $(obj_recipe_src_file) > $(obj_recipe_dep_file).$(dep_ext_tmp)
+	$(echo_recipe)$(cxx.mkdeps) $@ $(cxx.mkdeps.cxxflags) $(obj_recipe_src_file) > $(obj_recipe_dep_file).$(dep_ext_tmp)
 	$(echo_recipe)$(obj_recipe_makefile_deps) >>$(obj_recipe_dep_file).$(dep_ext_tmp)
 	$(echo_recipe)mv $(obj_recipe_dep_file).$(dep_ext_tmp) $(obj_recipe_dep_file)
 	$(echo_recipe)$(cxx) -o $@ -c $(cxxflags) $(obj_recipe_src_file)
@@ -251,7 +257,7 @@ $(objs_as): $(obj_prereq_src_file) $(obj_makefiles) | $(target_prereq_parent_dir
 
 $(libs): $$($$@.objs) $$($$@.src_dir)
 	$(echo_build_message)
-	$(echo_recipe)rm -f $@ && $(ar) qcs $@ $(filter %.o,$^)
+	$(echo_recipe)rm -f $@ && $(ar.mklib) $@ $(filter %.o,$^)
 
 bin_recipe_lib_flags_pre_linux := -Wl,--whole-archive
 bin_recipe_lib_flags_post_linux := -Wl,--no-whole-archive
