@@ -6,6 +6,7 @@ CXXFLAGS += -g
 cxxflags_clang++ :=
 cxxflags_clang++ += -Weverything
 cxxflags_clang++ += -Wno-c++98-compat
+cxxflags_clang++ += -Wno-poison-system-directories
 
 cxxflags_g++ :=
 cxxflags_g++ += -Wall
@@ -15,7 +16,7 @@ cxxflags_g++ += -Wpedantic
 CXXFLAGS += -Werror
 CXXFLAGS += -Wno-error=padded
 
-CXX := $(if $(filter c++,$(CXX)),$(shell readlink `type -p c++`),$(CXX))
+CXX := $(if $(filter c++,$(CXX)),clang++,$(CXX))
 
 ifeq ($(origin cxxflags_$(CXX)),undefined)
   $(error cxxflags_$(CXX): undefined)
