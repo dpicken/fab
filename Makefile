@@ -14,6 +14,7 @@ SHELL := bash
 SRC_DIR ?= src
 SRC_EXT_CXX ?= cc
 SRC_EXT_AS ?= s
+SRC_EXT_PLD ?= pld
 BUILD_DIR ?= build
 CXX ?= g++
 CXXFLAGS ?=
@@ -24,6 +25,8 @@ ASFLAGS ?=
 AR ?= ar
 AR.MKLIB ?= $(AR) qcs
 LDFLAGS ?=
+PLD ?= galette
+PLDFLAGS ?= --nochip --nofuse --nopin
 
 # Default project configuration that MAY be overriden by the environment (or config*.make files).
 ECHO_BUILD_MESSAGES ?= x
@@ -44,6 +47,7 @@ endif
 src_dir := $(SRC_DIR)
 src_ext_cxx := $(SRC_EXT_CXX)
 src_ext_as := $(SRC_EXT_AS)
+src_ext_pld := $(SRC_EXT_PLD)
 build_dir := $(BUILD_DIR)
 cxx := $(CXX)
 cxxflags := $(strip -I$(src_dir) $(CXXFLAGS))
@@ -54,6 +58,8 @@ asflags := $(ASFLAGS)
 ar := $(AR)
 ar.mklib := $(AR.MKLIB)
 ldflags := $(LDFLAGS)
+pld := $(PLD)
+pldflags := $(PLDFLAGS)
 echo_build_messages := $(ECHO_BUILD_MESSAGES)
 echo_recipes := $(ECHO_RECIPES)
 
@@ -103,10 +109,12 @@ define eval_lib
   src_file_stem_pattern := $$(if $$(patsubst platform,,$$(notdir $$(src_sub_dir))),*,*.$(host_os)-$(host_machine_type))
   lib_srcs_cxx := $$(wildcard $$(src_sub_dir)/$$(src_file_stem_pattern).$(src_ext_cxx))
   lib_srcs_as := $$(wildcard $$(src_sub_dir)/$$(src_file_stem_pattern).$(src_ext_as))
+  lib_srcs_pld := $$(wildcard $$(src_sub_dir)/$$(src_file_stem_pattern).$(src_ext_pld))
 
   lib_objs_cxx := $$(patsubst $(src_dir)%,$(build_dir)%.o,$$(lib_srcs_cxx))
   lib_objs_as := $$(patsubst $(src_dir)%,$(build_dir)%.o,$$(lib_srcs_as))
-  lib_objs := $$(strip $$(lib_objs_cxx) $$(lib_objs_as))
+  lib_objs_pld := $$(patsubst $(src_dir)%,$(build_dir)%.o,$$(lib_srcs_pld))
+  lib_objs := $$(strip $$(lib_objs_cxx) $$(lib_objs_as) $$(lib_objs_pld))
 
   ifneq ($$(lib_objs),)
     lib := $$(patsubst $(src_dir)%,$(build_dir)%,$$(src_sub_dir)/$$(notdir $$(src_sub_dir).a))
@@ -115,15 +123,17 @@ define eval_lib
 
     srcs_cxx += $$(lib_srcs_cxx)
     srcs_as += $$(lib_srcs_as)
+    srcs_pld += $$(lib_srcs_pld)
     objs_cxx += $$(lib_objs_cxx)
     objs_as += $$(lib_objs_as)
+    objs_pld += $$(lib_objs_pld)
     libs += $$(lib)
   endif
 endef
 $(foreach src_sub_dir,$(src_sub_dirs),$(eval $(call eval_lib,$(src_sub_dir))))
 lib_build_dirs := $(foreach lib,$(libs),$(patsubst %/,%,$(dir $(lib))))
 
-deps := $(patsubst %.o,%.d,$(strip $(objs_cxx) $(objs_as)))
+deps := $(patsubst %.o,%.d,$(strip $(objs_cxx) $(objs_as) $(objs_pld)))
 
 # An executable binary is built for each directory that contains a "main.cc" and/or a "bin.make" file.
 # The binary is named after the directory, e.g. the source tree...
@@ -217,7 +227,7 @@ all: $(libs) $(bins) $(test_passes)
 
 .PHONEY: clean
 clean:
-	$(echo_recipe)[ ! -d $(build_dir) ] || find $(build_dir) -type f \( -name '*.o' -o -name '*.d' -o -name '*.a' -o $(if $(findstring linux,$(host_os)),-executable,-perm +u=x,g=x,o=x) -o -name '*.log' -o -name '*.pass' \) -delete
+	$(echo_recipe)[ ! -d $(build_dir) ] || find $(build_dir) -type f \( -name '*.o' -o -name '*.d' -o -name '*.a' -o -name '*.tmp' -o $(if $(findstring linux,$(host_os)),-executable,-perm +u=x,g=x,o=x) -o -name '*.log' -o -name '*.pass' \) -delete
 	$(echo_recipe)[ ! -d $(build_dir) ] || find $(build_dir) -type d -delete
 
 .PHONEY: inspect
@@ -254,6 +264,14 @@ $(objs_as): $(obj_prereq_src_file) $(obj_makefiles) | $(target_prereq_parent_dir
 	$(echo_recipe)$(obj_recipe_makefile_deps) >>$(obj_recipe_dep_file).$(dep_ext_tmp)
 	$(echo_recipe)mv $(obj_recipe_dep_file).$(dep_ext_tmp) $(obj_recipe_dep_file)
 	$(echo_recipe)$(as) -o $@ $(asflags) $(obj_recipe_src_file)
+
+$(objs_pld): $(obj_prereq_src_file) $(obj_makefiles) | $(target_prereq_parent_dir)
+	$(echo_build_message)
+	$(echo_recipe)echo "$@: $(obj_recipe_src_file)" >$(obj_recipe_dep_file).$(dep_ext_tmp)
+	$(echo_recipe)$(obj_recipe_makefile_deps) >>$(obj_recipe_dep_file).$(dep_ext_tmp)
+	$(echo_recipe)mv $(obj_recipe_dep_file).$(dep_ext_tmp) $(obj_recipe_dep_file)
+	$(echo_recipe)cp $< $(basename $@).tmp
+	$(echo_recipe)$(pld) $(pldflags) $(basename $@).tmp && mv $(basename $@).jed $@
 
 $(libs): $$($$@.objs) $$($$@.src_dir)
 	$(echo_build_message)
