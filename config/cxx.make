@@ -1,4 +1,4 @@
-CXXSTD ?= -std=c++17
+CXXSTD ?= -std=c++20
 
 CXXFLAGS += $(CXXSTD)
 CXXFLAGS += -g
@@ -14,7 +14,7 @@ cxxflags_g++ += -Wextra
 cxxflags_g++ += -Wpedantic
 
 CXXFLAGS += -Werror
-CXXFLAGS += -Wno-error=padded
+CXXFLAGS += -Wno-padded
 
 CXX := $(if $(filter c++,$(CXX)),clang++,$(CXX))
 
