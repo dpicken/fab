@@ -7,6 +7,7 @@ cxxflags_clang++ :=
 cxxflags_clang++ += -Weverything
 cxxflags_clang++ += -Wno-c++98-compat
 cxxflags_clang++ += -Wno-poison-system-directories
+cxxflags_clang++ += -Wno-pre-c++20-compat-pedantic
 
 cxxflags_g++ :=
 cxxflags_g++ += -Wall
@@ -15,6 +16,7 @@ cxxflags_g++ += -Wpedantic
 
 CXXFLAGS += -Werror
 CXXFLAGS += -Wno-padded
+CXXFLAGS += -Wno-packed
 
 CXX := $(if $(filter c++,$(CXX)),clang++,$(CXX))
 

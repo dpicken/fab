@@ -222,15 +222,17 @@ build_dir_tree := $(sort $(foreach path,$(sort $(lib_build_dirs) $(bin_build_dir
 echo_build_message = $(if $(echo_build_messages),$(info Building $@$(if $?, on $(if $(filter-out $?,$^),$?,$^))))
 echo_recipe := $(if $(echo_recipes),,@)
 
-.PHONEY: all
+init:
+
+.PHONY: all
 all: $(libs) $(bins) $(test_passes)
 
-.PHONEY: clean
+.PHONY: clean
 clean:
 	$(echo_recipe)[ ! -d $(build_dir) ] || find $(build_dir) -type f \( -name '*.o' -o -name '*.d' -o -name '*.a' -o -name '*.tmp' -o $(if $(findstring linux,$(host_os)),-executable,-perm +u=x,g=x,o=x) -o -name '*.log' -o -name '*.pass' \) -delete
 	$(echo_recipe)[ ! -d $(build_dir) ] || find $(build_dir) -type d -delete
 
-.PHONEY: inspect
+.PHONY: inspect
 inspect:
 	$(echo_recipe)true $(foreach i,$(sort $(.VARIABLES)),$(if $(filter-out automatic default environment,$(origin $i)),$(info $i=$(value $i))))
 
@@ -240,7 +242,7 @@ inspect:
 
 target_prereq_parent_dir := $$(patsubst %/,%,$$(dir $$@))
 
-$(build_dir_tree): | $(target_prereq_parent_dir)
+$(build_dir_tree): | init $(target_prereq_parent_dir)
 	$(echo_build_message)
 	$(echo_recipe)mkdir $(if $(findstring B,$(MAKEFLAGS)),-p )$@
 
