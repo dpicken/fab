@@ -224,6 +224,9 @@ echo_recipe := $(if $(echo_recipes),,@)
 
 init:
 
+.PHONY: test
+test : $(test_passes)
+
 .PHONY: all
 all: $(libs) $(bins) $(test_passes)
 

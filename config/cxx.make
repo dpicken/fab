@@ -8,6 +8,7 @@ cxxflags_clang++ += -Weverything
 cxxflags_clang++ += -Wno-c++98-compat
 cxxflags_clang++ += -Wno-poison-system-directories
 cxxflags_clang++ += -Wno-pre-c++20-compat-pedantic
+cxxflags_clang++ += -Wno-shadow-field-in-constructor
 
 cxxflags_g++ :=
 cxxflags_g++ += -Wall
