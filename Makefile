@@ -282,14 +282,16 @@ $(libs): $$($$@.objs) $$($$@.src_dir)
 	$(echo_build_message)
 	$(echo_recipe)rm -f $@ && $(ar.mklib) $@ $(filter %.o,$^)
 
-bin_recipe_lib_flags_pre_linux := -Wl,--whole-archive
-bin_recipe_lib_flags_post_linux := -Wl,--no-whole-archive
-bin_recipe_lib_flags_pre_darwin := -Wl,-force_load
-bin_recipe_lib_flags_post_darwin :=
-ifeq ($(origin bin_recipe_lib_flags_post_$(host_os)),undefined)
-  $(error bin_recipe_lib_flags_post_$(host_os): undefined)
+bin_recipe_lib_flags_pre_g++ := -Wl,--whole-archive
+bin_recipe_lib_flags_post_g++ := -Wl,--no-whole-archive
+bin_recipe_lib_flags_pre_clang++ := -Wl,-force_load
+bin_recipe_lib_flags_post_clang++ :=
+bin_recipe_lib_flags_pre_c++ := $(bin_recipe_lib_flags_pre_clang++)
+bin_recipe_lib_flags_post_c++ := $(bin_recipe_lib_flags_post_clang++)
+ifeq ($(origin bin_recipe_lib_flags_post_$(cxx)),undefined)
+  $(error bin_recipe_lib_flags_post_$(cxx): undefined)
 endif
-bin_recipe_lib_flags = $(patsubst %,$(bin_recipe_lib_flags_pre_$(host_os)) % $(bin_recipe_lib_flags_post_$(host_os)),$(filter %.a,$^))
+bin_recipe_lib_flags = $(patsubst %,$(bin_recipe_lib_flags_pre_$(cxx)) % $(bin_recipe_lib_flags_post_$(cxx)),$(filter %.a,$^))
 bin_recipe_system_lib_flags = $(patsubst %,-l%,$($@.system_libs))
 
 $(bins): $$($$@.libs) $$($$@.bin_makefile) | $(target_prereq_parent_dir)

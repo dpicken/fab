@@ -28,10 +28,7 @@ endif
 CXXFLAGS += $(cxxflags_$(CXX))
 
 ldflags_clang++ :=
-ldflags_clang++ += -lpthread
-
 ldflags_g++ :=
-ldflags_g++ += -pthread
 
 ifeq ($(origin ldflags_$(CXX)),undefined)
   $(error ldflags_$(CXX): undefined)
