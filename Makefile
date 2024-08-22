@@ -32,6 +32,9 @@ PLDFLAGS ?= --nochip --nofuse --nopin
 ECHO_BUILD_MESSAGES ?= x
 ECHO_RECIPES ?=
 
+# Source files MUST be placed in directories beneath $(src_dir).
+CMD_FIND_SRC_STEM ?= find $(src_dir) -mindepth 1
+
 makefile := $(lastword $(MAKEFILE_LIST))
 config_makefiles := $(wildcard config/*.make)
 include $(config_makefiles)
@@ -62,13 +65,11 @@ pld := $(PLD)
 pldflags := $(PLDFLAGS)
 echo_build_messages := $(ECHO_BUILD_MESSAGES)
 echo_recipes := $(ECHO_RECIPES)
+cmd_find_src_stem := $(CMD_FIND_SRC_STEM)
 
 # Host information
 host_os := $(shell uname -s | tr "[:upper:]" "[:lower:]")
 host_machine_type := $(shell uname -m | tr "[:upper:]" "[:lower:]")
-
-# Source files MUST be placed in directories beneath $(src_dir).
-cmd_find_src_stem := find $(src_dir) -mindepth 1
 
 srcs_cxx :=
 srcs_as :=
