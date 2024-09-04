@@ -225,11 +225,17 @@ echo_recipe := $(if $(echo_recipes),,@)
 
 init:
 
+.PHONY: libs
+libs: $(libs)
+
+.PHONY: bins
+bins: $(bins)
+
 .PHONY: test
 test : $(test_passes)
 
 .PHONY: all
-all: $(libs) $(bins) $(test_passes)
+all: libs bins test
 
 .PHONY: clean
 clean:
