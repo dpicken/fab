@@ -11,6 +11,7 @@ cxxflags_clang++ += -Wno-poison-system-directories
 cxxflags_clang++ += -Wno-pre-c++20-compat-pedantic
 cxxflags_clang++ += -Wno-shadow-field-in-constructor
 cxxflags_clang++ += -Wno-unused-private-field
+cxxflags_clang++ += -Wno-switch-default
 
 cxxflags_g++ :=
 cxxflags_g++ += -Wall
